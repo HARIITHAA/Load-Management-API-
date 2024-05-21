@@ -1,0 +1,42 @@
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from pydantic import BaseModel
+from typing import List
+import pandas as pd
+import io
+from fastapi.responses import StreamingResponse
+
+from fastapi import FastAPI
+
+app = FastAPI()
+
+
+class Load(BaseModel):
+    name: str
+    quantity: int
+    price: float
+
+@app.post("/upload", response_model=List[Load])
+async def upload_excel(file: UploadFile = File(...)):
+    try:
+        df = pd.read_excel(io.BytesIO(await file.read()))
+        loads = df.to_dict(orient='records')
+        return loads
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/download")
+async def download_excel():
+    try:
+        example_data = [
+            {"name": "Product A", "quantity": 10, "price": 100.0},
+            {"name": "Product B", "quantity": 5, "price": 50.0},
+            {"name": "Product C", "quantity": 20, "price": 200.0}
+        ]
+        df = pd.DataFrame(example_data)
+        excel_data = io.BytesIO()
+        df.to_excel(excel_data, index=False)
+        excel_data.seek(0)
+        return StreamingResponse(content=excel_data, media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', headers={'Content-Disposition': 'attachment; filename="output.xlsx"'})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
